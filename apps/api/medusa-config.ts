@@ -1,4 +1,4 @@
-import { loadEnv } from '@medusajs/framework/utils'
+import { ContainerRegistrationKeys, Modules, loadEnv } from '@medusajs/framework/utils'
 import { withMercur } from '@mercurjs/core'
 
 loadEnv(process.env.NODE_ENV || 'development', process.cwd())
@@ -40,6 +40,29 @@ module.exports = withMercur({
     },
   ],
   modules: [
+    // 19-3: the buyer identity bridge. The default AUTH module registers
+    // only emailpass, and overriding a module replaces its options
+    // entirely (last entry wins), so emailpass is re-listed here. The
+    // MFA defaults (incl. the encryption key) are merged back by
+    // defineConfig (applyDefaultAuthMfaOptions). CUSTOMER is a declared
+    // dependency so the consumer provider can resolve the customer
+    // module from its own container.
+    {
+      resolve: '@medusajs/medusa/auth',
+      dependencies: [Modules.CUSTOMER, ContainerRegistrationKeys.LOGGER],
+      options: {
+        providers: [
+          { resolve: '@medusajs/medusa/auth-emailpass', id: 'emailpass' },
+          {
+            resolve: './src/modules/auth-consumer',
+            id: 'consumer',
+            options: {
+              bridgeSecret: process.env.MERCUR_BRIDGE_SECRET,
+            },
+          },
+        ],
+      },
+    },
     ...(STRIPE_SECRET_KEY
       ? [
           {

@@ -1,0 +1,15 @@
+# The image needs the full source (bun install + the workspace builds
+# run inside it): only VCS metadata, dependency caches and build
+# artifacts are excluded. (The workspaces field lists apps/*,
+# packages/*, packages/plugins/*, integration-tests and e2e-tests —
+# their package.json files must stay.)
+.git
+node_modules
+**/node_modules
+**/.medusa
+**/.turbo
+**/.next
+**/dist
+.DS_Store
+**/.DS_Store
+**/*.log
