@@ -59,8 +59,9 @@ export const UserDropdown = ({
           </div>
         ) : (
           <div className="p-1">
+            {/* Neson fork (19-4): no self-registration — consumers log
+                in through the phone rail (there is no /register). */}
             <NavigationItem href="/login">Login</NavigationItem>
-            <NavigationItem href="/register">Register</NavigationItem>
           </div>
         )}
       </Dropdown>

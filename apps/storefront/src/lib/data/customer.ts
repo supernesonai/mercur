@@ -54,78 +54,12 @@ export const updateCustomer = async (body: HttpTypes.StoreUpdateCustomer) => {
   return updateRes;
 };
 
-export async function signup(formData: FormData) {
-  const password = formData.get('password') as string;
-  const customerForm = {
-    email: formData.get('email') as string,
-    first_name: formData.get('first_name') as string,
-    last_name: formData.get('last_name') as string,
-    phone: formData.get('phone') as string
-  };
-
-  try {
-    const token = await (sdk.auth.$actorType.$authProvider.register
-      .mutate({
-        $actorType: 'customer',
-        $authProvider: 'emailpass',
-        email: customerForm.email,
-        password: password
-      } as never) as unknown as Promise<{ token: string }>)
-      .then(({ token }) => token);
-
-    await setAuthToken(token as string);
-
-    const headers = {
-      ...(await getAuthHeaders())
-    };
-
-    const { customer: createdCustomer } = await (sdk.store.customers.mutate({
-      ...customerForm,
-      fetchOptions: { headers }
-    } as never) as unknown as Promise<{ customer: HttpTypes.StoreCustomer }>);
-
-    const loginToken = await (sdk.auth.$actorType.$authProvider
-      .mutate({
-        $actorType: 'customer',
-        $authProvider: 'emailpass',
-        email: customerForm.email,
-        password
-      } as never) as unknown as Promise<{ token: string }>)
-      .then(({ token }) => token);
-
-    await setAuthToken(loginToken as string);
-
-    const customerCacheTag = await getCacheTag('customers');
-    revalidateTag(customerCacheTag, { expire: 0 });
-
-    await transferCart();
-
-    return createdCustomer;
-  } catch (error: any) {
-    return error.toString();
-  }
-}
-
-export async function login(formData: FormData) {
-  const email = formData.get('email') as string;
-  const password = formData.get('password') as string;
-
-  try {
-    const token = await (sdk.auth.$actorType.$authProvider
-      .mutate({ $actorType: 'customer', $authProvider: 'emailpass', email, password } as never) as unknown as Promise<{ token: string }>)
-      .then(({ token }) => token);
-    await setAuthToken(token as string);
-    const customerCacheTag = await getCacheTag('customers');
-    revalidateTag(customerCacheTag, { expire: 0 });
-
-    return { success: true };
-  } catch (error: unknown) {
-    return {
-      success: false,
-      message: (error as Error)?.message || 'Unable to log in. Please try again.'
-    };
-  }
-}
+// Neson fork (19-4): the email/password login + self-registration are
+// gone — the marketplace has no such accounts. A consumer logs in
+// through the phone rail the platform bridge owns (18-6): the form
+// posts to /api/consumer/code and /api/consumer/login, which verify
+// the code and exchange the OpenIM token for the customer JWT (19-3)
+// and set the session cookie.
 
 export async function signout() {
   await removeAuthToken();

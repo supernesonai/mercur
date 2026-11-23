@@ -1,26 +1,30 @@
 'use client';
 
 import { useState } from 'react';
-
 import { zodResolver } from '@hookform/resolvers/zod';
-import Link from 'next/link';
 import { useRouter, useSearchParams } from 'next/navigation';
-import { FieldError, FieldValues, FormProvider, useForm, useFormContext } from 'react-hook-form';
+import { FieldError, FormProvider, useForm, useFormContext } from 'react-hook-form';
 
-import { Button } from '@/components/atoms/Button/Button';
 import { Alert } from '@/components/atoms/Alert/Alert';
+import { Button } from '@/components/atoms/Button/Button';
 import { LabeledInput } from '@/components/cells/LabeledInput/LabeledInput';
-import { login, transferCart } from '@/lib/data/customer';
+import { transferCart } from '@/lib/data/customer';
 import { toast } from '@/lib/helpers/toast';
 
 import { LoginFormData, loginFormSchema } from './schema';
 
+// Neson consumer login (19-4). The marketplace has no email/password
+// accounts: a consumer logs in through the phone rail the platform
+// bridge owns (18-6). Step 1 requests the one-time code (the mock
+// rail returns it); step 2 verifies it — the bridge then exchanges
+// the consumer's OpenIM token for the marketplace customer JWT (19-3)
+// and the storefront stores it as the Medusa session cookie.
 export const LoginForm = () => {
   const methods = useForm<LoginFormData>({
     resolver: zodResolver(loginFormSchema),
     defaultValues: {
-      email: '',
-      password: ''
+      phone: '',
+      code: ''
     }
   });
 
@@ -32,7 +36,8 @@ export const LoginForm = () => {
 };
 
 const Form = () => {
-  const [isAuthError, setIsAuthError] = useState(false);
+  const [codeRequested, setCodeRequested] = useState(false);
+  const [mockCode, setMockCode] = useState('');
   const {
     handleSubmit,
     register,
@@ -43,26 +48,43 @@ const Form = () => {
   const isSessionExpired = searchParams.get('sessionExpired') === 'true';
   const isSessionRequired = searchParams.get('sessionRequired') === 'true';
 
-  const submit = async (data: FieldValues) => {
-    const formData = new FormData();
-    formData.append('email', data.email);
-    formData.append('password', data.password);
-
-    const res = await login(formData);
-
-    if (res.success) {
-      router.push('/user');
-      await transferCart();
-    } else {
-      toast.error({ title: res.message || 'An error occurred. Please try again.' });
+  const requestCode = async (data: LoginFormData) => {
+    const res = await fetch('/api/consumer/code', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone: data.phone })
+    });
+    const out = (await res.json()) as {
+      error?: string
+      mockCode?: string
+    };
+    if (!res.ok) {
+      toast.error({ title: out.error || 'Unable to request a code.' });
+      return;
     }
-
-    setIsAuthError(false);
-    router.push('/user');
+    setMockCode(out.mockCode ?? '');
+    setCodeRequested(true);
   };
 
-  const clearApiError = () => {
-    isAuthError && setIsAuthError(false);
+  const submit = async (data: LoginFormData) => {
+    if (!data.code) {
+      toast.error({ title: 'Please enter the code.' });
+      return;
+    }
+    const res = await fetch('/api/consumer/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ phone: data.phone, code: data.code })
+    });
+    const out = (await res.json()) as { success?: boolean; error?: string };
+    if (res.ok && out.success) {
+      await transferCart();
+      router.push('/user');
+    } else {
+      toast.error({
+        title: out.error || 'Unable to log in. Please try again.'
+      });
+    }
   };
 
   const getAuthMessage = () => {
@@ -97,70 +119,59 @@ const Form = () => {
         >
           <h1 className="heading-md mb-8 uppercase text-primary">Log in</h1>
           <form
-            onSubmit={handleSubmit(submit)}
+            onSubmit={codeRequested ? handleSubmit(submit) : handleSubmit(requestCode)}
             data-testid="login-form"
           >
             <div className="space-y-4">
               <LabeledInput
-                label="E-mail"
-                placeholder="Your e-mail address"
-                error={
-                  (errors.email as FieldError) ||
-                  (isAuthError ? ({ message: '' } as FieldError) : undefined)
-                }
-                data-testid="login-email-input"
-                {...register('email', {
-                  onChange: clearApiError
-                })}
+                label="Phone"
+                placeholder="+64 21 000 0000"
+                error={errors.phone as FieldError | undefined}
+                data-testid="login-phone-input"
+                {...register('phone')}
               />
-              <LabeledInput
-                label="Password"
-                placeholder="Your password"
-                type="password"
-                error={
-                  (errors.password as FieldError) ||
-                  (isAuthError ? ({ message: '' } as FieldError) : undefined)
-                }
-                data-testid="login-password-input"
-                {...register('password', {
-                  onChange: clearApiError
-                })}
-              />
+              {codeRequested && (
+                <LabeledInput
+                  label="Code"
+                  placeholder="The code we sent"
+                  error={errors.code as FieldError | undefined}
+                  data-testid="login-code-input"
+                  {...register('code')}
+                />
+              )}
             </div>
 
-            <Link
-              href="/forgot-password"
-              className="label-md mt-4 block text-right uppercase text-action-on-secondary"
-              data-testid="login-forgot-password-link"
-            >
-              Forgot your password?
-            </Link>
+            {codeRequested && mockCode && (
+              <p
+                className="label-md mt-4 text-primary"
+                data-testid="login-mock-code"
+              >
+                Staging fixture code: {mockCode}
+              </p>
+            )}
 
             <Button
               className="mt-8 w-full uppercase"
               disabled={isSubmitting}
               data-testid="login-submit-button"
             >
-              Log in
+              {codeRequested ? 'Log in' : 'Send code'}
             </Button>
-          </form>
-        </div>
 
-        <div className="rounded-sm border p-4">
-          <h2 className="heading-md mb-4 uppercase text-primary">
-            Don&apos;t have an account yet?
-          </h2>
-          <Link
-            href="/register"
-            data-testid="login-register-link"
-          >
-            <Button
-              variant="tonal"
-              className="mt-8 flex w-full justify-center uppercase"
-            >
-              Create account
-            </Button>
-          </Link>
+            {codeRequested && (
+              <button
+                type="button"
+                className="label-md mt-4 block w-full uppercase text-action-on-secondary"
+                data-testid="login-back-button"
+                onClick={() => {
+                  setCodeRequested(false);
+                  setMockCode('');
+                }}
+              >
+                Use a different number
+              </button>
+            )}
+          </form>
         </div>
       </div>
     </main>

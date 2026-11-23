@@ -53,7 +53,11 @@ export const setAuthToken = async (token: string) => {
     maxAge: 60 * 60 * 24 * 7,
     httpOnly: true,
     sameSite: 'lax',
-    secure: process.env.NODE_ENV === 'production',
+    // Neson fork (19-4): the Secure flag is opt-in (COOKIE_SECURE=1),
+    // not implied by NODE_ENV — staging serves the storefront over
+    // plain HTTP (NodePort on the LAN) and a Secure cookie set there
+    // would be dropped by the browser, breaking the session entirely.
+    secure: process.env.COOKIE_SECURE === '1',
   });
 };
 
@@ -75,7 +79,9 @@ export const setCartId = async (cartId: string) => {
     maxAge: 60 * 60 * 24 * 7,
     httpOnly: true,
     sameSite: 'strict',
-    secure: process.env.NODE_ENV === 'production',
+    // Same opt-in Secure discipline as setAuthToken (19-4): staging is
+    // plain-HTTP, production sets COOKIE_SECURE=1.
+    secure: process.env.COOKIE_SECURE === '1',
   });
 };
 
