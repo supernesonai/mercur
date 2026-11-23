@@ -190,9 +190,20 @@ export class StripeConnectPayoutProviderService implements IPayoutProvider {
     }
   }
 
-  async createLoginLink(input: CreateLoginLinkInput): Promise<LinkOutput> {
-    const link = await this.stripe_.accounts.createLoginLink(input.account.id)
-    return { url: link.url, data: asRecord(link) }
+  async createLoginLink(input: CreateLoginLinkInput): Promise<LinkOutput | null> {
+    try {
+      const link = await this.stripe_.accounts.createLoginLink(input.account.id)
+      return { url: link.url, data: asRecord(link) }
+    } catch (error) {
+      // An account created with `dashboard: "none"` (onboarded programmatically
+      // by the platform) has no Express dashboard to log into; Stripe refuses
+      // the link. There is no login link to publish for it — the onboarding
+      // (edit) link remains the account's own surface.
+      if (/does not have access to the Express Dashboard/.test((error as Error)?.message ?? "")) {
+        return null
+      }
+      throw toPayoutProviderError(error)
+    }
   }
 
   protected sourceTransactionFrom(source: CreatePayoutInput["source_payment"]): string | undefined {

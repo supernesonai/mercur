@@ -81,7 +81,23 @@ describe("StripeConnectPayoutProviderService", () => {
     expect(calls[0].method).toBe("accountLinks.create")
     const login = await service.createLoginLink({ account })
     expect(calls[1].method).toBe("accounts.createLoginLink")
-    expect(login.url).toContain("login")
+    expect(login?.url).toContain("login")
+  })
+
+  it("publishes no login link for an account without a dashboard", async () => {
+    const { service } = build()
+    const accounts = (service as unknown as { stripe_: { accounts: { createLoginLink: unknown } } }).stripe_.accounts
+    accounts.createLoginLink = () =>
+      Promise.reject(new Error("Cannot create an edit link for the account acct_none, which does not have access to the Express Dashboard."))
+    const login = await service.createLoginLink({ account })
+    expect(login).toBeNull()
+  })
+
+  it("still fails the login link on other Stripe errors", async () => {
+    const { service } = build()
+    const accounts = (service as unknown as { stripe_: { accounts: { createLoginLink: unknown } } }).stripe_.accounts
+    accounts.createLoginLink = () => Promise.reject(new Error("Some other Stripe failure"))
+    await expect(service.createLoginLink({ account })).rejects.toBeInstanceOf(PayoutProviderError)
   })
 
   it("pays out as a transfer with the charge as source_transaction, resolving a PaymentIntent when needed", async () => {

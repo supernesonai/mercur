@@ -168,7 +168,13 @@ export interface IPayoutProvider {
   deleteAccount?(input: DeleteAccountInput): Promise<void>
   listAccounts?(input: ListAccountsInput): Promise<ListAccountsOutput>
   createOnboarding(input: CreateOnboardingInput): Promise<LinkOutput>
-  createLoginLink?(input: CreateLoginLinkInput): Promise<LinkOutput>
+  /**
+   * `null` when the provider cannot issue a dashboard login link for this
+   * account — an account without a dashboard (created headless and onboarded
+   * programmatically by the platform) has none to log into. The onboarding
+   * link then remains the account's own surface.
+   */
+  createLoginLink?(input: CreateLoginLinkInput): Promise<LinkOutput | null>
   createPayout(input: CreatePayoutInput): Promise<PayoutOutput>
   reversePayout(input: ReversePayoutInput): Promise<PayoutOutput>
   getWebhookActionAndData(payload: PayoutWebhookActionInput): Promise<PayoutWebhookResult>

@@ -45,7 +45,7 @@ export abstract class AbstractPayoutProvider<TConfig = Record<string, unknown>>
   deleteAccount?(input: DeleteAccountInput): Promise<void>
   listAccounts?(input: ListAccountsInput): Promise<ListAccountsOutput>
   abstract createOnboarding(input: CreateOnboardingInput): Promise<LinkOutput>
-  createLoginLink?(input: CreateLoginLinkInput): Promise<LinkOutput>
+  createLoginLink?(input: CreateLoginLinkInput): Promise<LinkOutput | null>
   abstract createPayout(input: CreatePayoutInput): Promise<PayoutOutput>
   abstract reversePayout(input: ReversePayoutInput): Promise<PayoutOutput>
   abstract getWebhookActionAndData(
